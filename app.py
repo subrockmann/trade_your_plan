@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 import yfinance as yf
 import pandas as pd
+import numpy as np
 import talib
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
@@ -27,8 +28,24 @@ intervals = [
 
 
 def download_data(symbol, interval):
-    data = yf.download(symbol, interval=interval)
-    return data
+    if interval =="1d":
+        data = yf.download(symbol, interval=interval)
+        return data
+    elif interval == "1h":
+        # Calculate the start date (2 years ago from today)
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=728)
+
+        # Download the data
+        data = yf.download(symbol, start=start_date.strftime('%Y-%m-%d'), interval='1h')
+        data=yf.download(symbol, period="1y",interval=interval)
+        return data
+
+def point_pos(data, column):
+    if data[column]==1:
+        return data["RSI_14"]
+    else:
+        return None
 
 
 def calculate_indicators(data, ema5_window, ema20_window, rsi_window):
@@ -36,19 +53,27 @@ def calculate_indicators(data, ema5_window, ema20_window, rsi_window):
     data["EMA_20"] = talib.EMA(data["Close"], timeperiod=ema20_window)
     data["RSI_14"] = talib.RSI(data["Close"], timeperiod=rsi_window)
     data["SMA_RSI_14"] = data["RSI_14"].rolling(window=14).mean()
-    #data["signal_1"] = ((data["RSI_14"].shift(1) < data["SMA_RSI_14"].shift(1)) & (data["RSI_14"] >= data["SMA_RSI_14"])).astype(int)
-    #data["signal_2"] = ((data["Adj Close"].shift(1) < data["EMA_20"].shift(1)) & (data["Adj Close"] >= data["EMA_20"])).astype(int)
+    # data["signal_1"] = ((data["RSI_14"].shift(1) < data["SMA_RSI_14"].shift(1)) & (data["RSI_14"] >= data["SMA_RSI_14"])).astype(int)
+    data["point_pos_signal_2"] = ((data["Adj Close"].shift(1) < data["EMA_20"].shift(1)) & (data["Adj Close"] >= data["EMA_20"])).astype(int)
     data["signal_3"] = ((data["EMA_5"].shift(1) < data["EMA_20"].shift(1)) & (data["EMA_5"] >= data["EMA_20"])).astype(int)
     data["signal_1"] = ((data["RSI_14"] >= data["SMA_RSI_14"])).astype(int)
+    data["point_pos_signal_1"] = (
+        (data["RSI_14"].shift(1) < data["SMA_RSI_14"].shift(1))
+        & (data["RSI_14"] >= data["SMA_RSI_14"])
+    ).astype(int)
+
+    # data["point_pos_signal_1"] = data.apply(lambda x: point_pos(x, "signal_1"), axis=1)
     data["signal_2"] = ((data["Adj Close"] >= data["EMA_20"])).astype(int)
-    #data["signal_3"] = ((data["EMA_5"] >= data["EMA_20"])).astype(int)
+    # data["stop_price"] =
+    # data["signal_3"] = ((data["EMA_5"] >= data["EMA_20"])).astype(int)
     data["long_signal"] = ((data["signal_1"] + data["signal_2"] + data["signal_3"]) == 3).astype(int)
-    #data.reset_index(drop=False, inplace=True)
+    # data.reset_index(drop=False, inplace=True)
     return data
 
 
 # Function to plot data
 def plot_data(data, indices=[]):
+    
     global company_name
     config = {"scrollZoom": True}
     # Create a figure with two rows and shared x-axis
@@ -67,7 +92,7 @@ def plot_data(data, indices=[]):
     #     row=1,
     #     col=1,
     # )
-    fig.add_trace(go.Candlestick(x=data.index,
+    fig.add_trace(go.Candlestick(x=data.index, # data["Datetime"],#.index,
                                  open=data['Open'],
                                  high=data['High'],
                                  low=data['Low'],
@@ -121,6 +146,105 @@ def plot_data(data, indices=[]):
         row=2,
         col=1,
     )
+
+    # Filter out NaN values for point_pos_signal_1
+    signal_1_data = data[data["point_pos_signal_1"]==1]
+
+    fig.add_trace(
+        go.Scatter(
+            x=signal_1_data.index,
+            y=signal_1_data["point_pos_signal_1"],
+            mode="markers",
+            marker=dict(size=5, color="black"),
+        ),
+        row=2,
+        col=1,
+    )
+
+    # # Add background shading based on signal_1
+    # for i in range(len(data) - 1):
+    #     if data["signal_1"].iloc[i] == 1:
+    #         fig.add_shape(
+    #             type="rect",
+    #             x0=data.index[i],
+    #             x1=data.index[i + 1],
+    #             y0=0,
+    #             y1=1,
+    #             xref="x",
+    #             yref="paper",
+    #             fillcolor="LightGreen",
+    #             opacity=0.5,
+    #             layer="below",
+    #             line_width=0,
+    #         )
+
+    # Add shapes to highlight candles with signal_2
+
+    shapes = []
+    for idx in data.index[data["point_pos_signal_2"] == 1]:
+        shapes.append(
+            {
+                "type": "rect",
+                "x0": idx,
+                "x1": idx,
+                "y0": data.loc[idx, "Low"],
+                "y1": data.loc[idx, "High"],
+                "xref": "x",
+                "yref": "y",
+                "fillcolor": "pink",
+                "opacity": 0.2,
+                "line_width": 1,
+                "layer": "above",
+            }
+        )
+
+    # Add background shading based on signal_1
+
+    in_signal = False
+    for i in range(len(data)):
+        if data["signal_1"].iloc[i] == 1 and not in_signal:
+            start_idx = data.index[i]
+            in_signal = True
+        elif data["signal_1"].iloc[i] == 0 and in_signal:
+            end_idx = data.index[i]
+            shapes.append(
+                {
+                    "type": "rect",
+                    "x0": start_idx,
+                    "x1": end_idx,
+                    "y0": 0,
+                    "y1": 1,
+                    "xref": "x",
+                    "yref": "paper",
+                    "fillcolor": "LightGreen",
+                    "opacity": 0.5,
+                    "layer": "below",
+                    "line_width": 0,
+                }
+            )
+            in_signal = False
+
+    # Handle case where the signal extends to the end of the data
+    if in_signal:
+        end_idx = data.index[-1]
+        shapes.append(
+            {
+                "type": "rect",
+                "x0": start_idx,
+                "x1": end_idx,
+                "y0": 0,
+                "y1": 1,
+                "xref": "x",
+                "yref": "paper",
+                "fillcolor": "LightGreen",
+                "opacity": 0.5,
+                "layer": "below",
+                "line_width": 0,
+            }
+        )
+
+    # Update layout with shapes
+    fig.update_layout(shapes=shapes)
 
     # Update layout for the figure
     # Get the last 30 candles
@@ -185,6 +309,8 @@ def main():
     end_date = st.sidebar.date_input("End Date", datetime.today().date())
     start_date = st.sidebar.date_input("Start Date", end_date - timedelta(days=30))
 
+    candles = st.sidebar.number_input("Number of candles", min_value=30, max_value=1000, value=300)
+
     # end_date = datetime.today().date()
     # start_date = end_date - timedelta(days=30)
 
@@ -201,16 +327,24 @@ def main():
     # Download data
     data = download_data(symbol, interval)
 
+    # Remove weekends from the data
+    data = data[data.index.weekday < 5]
+    data.reset_index(inplace=True)
+    data.rename(columns={'index': 'Datetime'}, inplace=True)
+
     # Calculate indicators
     data = calculate_indicators(data, ema5_window, ema20_window, rsi_window)
-    signal_indices = data[data["long_signal"] == 1].index
+
+    data_reduced = data[-candles:-1]
+    signal_indices = data_reduced[data_reduced["long_signal"] == 1].index
     # signal_indices = data[
+
     #     (data["signal_1"] == 1) & (data["signal_2"] == 1) & (data["signal_3"] == 1)
     # ].index
 
     # Plot data
-    fig = plot_data(data, indices=signal_indices)
-    #fig = plot_data(data)
+    fig = plot_data(data_reduced, indices=signal_indices)
+    # fig = plot_data(data)
     st.plotly_chart(fig, use_container_width=True)  # Use full width of the container
 
 
