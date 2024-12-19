@@ -30,7 +30,7 @@ intervals = [
 def download_data(symbol, interval):
     if interval =="1d":
         data = yf.download(symbol, interval=interval)
-        return data
+        # return data
     elif interval == "1h":
         # Calculate the start date (2 years ago from today)
         end_date = datetime.now()
@@ -39,7 +39,13 @@ def download_data(symbol, interval):
         # Download the data
         data = yf.download(symbol, start=start_date.strftime('%Y-%m-%d'), interval='1h')
         data=yf.download(symbol, period="1y",interval=interval)
-        return data
+        # return data
+    data.index = pd.to_datetime(data.index)  # Ensure index is DatetimeIndex
+    data = data[data.index.weekday < 5]
+    data.reset_index(inplace=True)
+    data.rename(columns={"index": "Datetime"}, inplace=True)
+    return data
+
 
 def point_pos(data, column):
     if data[column]==1:
@@ -92,7 +98,7 @@ def plot_data(data, indices=[]):
     #     row=1,
     #     col=1,
     # )
-    fig.add_trace(go.Candlestick(x=data.index, # data["Datetime"],#.index,
+    fig.add_trace(go.Candlestick(x=data['Date'], #["Datetime"],#.index,
                                  open=data['Open'],
                                  high=data['High'],
                                  low=data['Low'],
@@ -102,7 +108,7 @@ def plot_data(data, indices=[]):
 
     fig.add_trace(
         go.Scatter(
-            x=data.index,
+            x=data['Date'],
             y=data["EMA_5"],
             mode="lines",
             name="EMA 5",
@@ -113,7 +119,7 @@ def plot_data(data, indices=[]):
     )
     fig.add_trace(
         go.Scatter(
-            x=data.index,
+            x=data['Date'],
             y=data["EMA_20"],
             mode="lines",
             name="EMA 20",
@@ -126,7 +132,7 @@ def plot_data(data, indices=[]):
     # Add trace for the RSI plot
     fig.add_trace(
         go.Scatter(
-            x=data.index,
+            x=data['Date'],
             y=data["RSI_14"],
             mode="lines",
             name="RSI 14",
@@ -137,7 +143,7 @@ def plot_data(data, indices=[]):
     )
     fig.add_trace(
         go.Scatter(
-            x=data.index,
+            x=data['Date'],
             y=data["SMA_RSI_14"],
             mode="lines",
             name="SMA of RSI 14",
@@ -147,111 +153,111 @@ def plot_data(data, indices=[]):
         col=1,
     )
 
-    # Filter out NaN values for point_pos_signal_1
-    signal_1_data = data[data["point_pos_signal_1"]==1]
+    # # Filter out NaN values for point_pos_signal_1
+    # signal_1_data = data[data["point_pos_signal_1"]==1]
 
-    fig.add_trace(
-        go.Scatter(
-            x=signal_1_data.index,
-            y=signal_1_data["point_pos_signal_1"],
-            mode="markers",
-            marker=dict(size=5, color="black"),
-        ),
-        row=2,
-        col=1,
-    )
+    # fig.add_trace(
+    #     go.Scatter(
+    #         x=signal_1_data.index,
+    #         y=signal_1_data["point_pos_signal_1"],
+    #         mode="markers",
+    #         marker=dict(size=5, color="black"),
+    #     ),
+    #     row=2,
+    #     col=1,
+    # )
+
+    # # # Add background shading based on signal_1
+    # # for i in range(len(data) - 1):
+    # #     if data["signal_1"].iloc[i] == 1:
+    # #         fig.add_shape(
+    # #             type="rect",
+    # #             x0=data.index[i],
+    # #             x1=data.index[i + 1],
+    # #             y0=0,
+    # #             y1=1,
+    # #             xref="x",
+    # #             yref="paper",
+    # #             fillcolor="LightGreen",
+    # #             opacity=0.5,
+    # #             layer="below",
+    # #             line_width=0,
+    # #         )
+
+    # # Add shapes to highlight candles with signal_2
+
+    # shapes = []
+    # for idx in data.index[data["point_pos_signal_2"] == 1]:
+    #     shapes.append(
+    #         {
+    #             "type": "rect",
+    #             "x0": idx,
+    #             "x1": idx,
+    #             "y0": data.loc[idx, "Low"],
+    #             "y1": data.loc[idx, "High"],
+    #             "xref": "x",
+    #             "yref": "y",
+    #             "fillcolor": "pink",
+    #             "opacity": 0.2,
+    #             "line_width": 1,
+    #             "layer": "above",
+    #         }
+    #     )
 
     # # Add background shading based on signal_1
-    # for i in range(len(data) - 1):
-    #     if data["signal_1"].iloc[i] == 1:
-    #         fig.add_shape(
-    #             type="rect",
-    #             x0=data.index[i],
-    #             x1=data.index[i + 1],
-    #             y0=0,
-    #             y1=1,
-    #             xref="x",
-    #             yref="paper",
-    #             fillcolor="LightGreen",
-    #             opacity=0.5,
-    #             layer="below",
-    #             line_width=0,
+
+    # in_signal = False
+    # for i in range(len(data)):
+    #     if data["signal_1"].iloc[i] == 1 and not in_signal:
+    #         start_idx = data.index[i]
+    #         in_signal = True
+    #     elif data["signal_1"].iloc[i] == 0 and in_signal:
+    #         end_idx = data.index[i]
+    #         shapes.append(
+    #             {
+    #                 "type": "rect",
+    #                 "x0": start_idx,
+    #                 "x1": end_idx,
+    #                 "y0": 0,
+    #                 "y1": 1,
+    #                 "xref": "x",
+    #                 "yref": "paper",
+    #                 "fillcolor": "LightGreen",
+    #                 "opacity": 0.5,
+    #                 "layer": "below",
+    #                 "line_width": 0,
+    #             }
     #         )
+    #         in_signal = False
 
-    # Add shapes to highlight candles with signal_2
+    # # Handle case where the signal extends to the end of the data
+    # if in_signal:
+    #     end_idx = data.index[-1]
+    #     shapes.append(
+    #         {
+    #             "type": "rect",
+    #             "x0": start_idx,
+    #             "x1": end_idx,
+    #             "y0": 0,
+    #             "y1": 1,
+    #             "xref": "x",
+    #             "yref": "paper",
+    #             "fillcolor": "LightGreen",
+    #             "opacity": 0.5,
+    #             "layer": "below",
+    #             "line_width": 0,
+    #         }
+    #     )
 
-    shapes = []
-    for idx in data.index[data["point_pos_signal_2"] == 1]:
-        shapes.append(
-            {
-                "type": "rect",
-                "x0": idx,
-                "x1": idx,
-                "y0": data.loc[idx, "Low"],
-                "y1": data.loc[idx, "High"],
-                "xref": "x",
-                "yref": "y",
-                "fillcolor": "pink",
-                "opacity": 0.2,
-                "line_width": 1,
-                "layer": "above",
-            }
-        )
+    # # Update layout with shapes
+    # fig.update_layout(shapes=shapes)
 
-    # Add background shading based on signal_1
+    # # Update layout for the figure
+    # # Get the last 30 candles
+    # last_30_candles = data.iloc[-30:]
 
-    in_signal = False
-    for i in range(len(data)):
-        if data["signal_1"].iloc[i] == 1 and not in_signal:
-            start_idx = data.index[i]
-            in_signal = True
-        elif data["signal_1"].iloc[i] == 0 and in_signal:
-            end_idx = data.index[i]
-            shapes.append(
-                {
-                    "type": "rect",
-                    "x0": start_idx,
-                    "x1": end_idx,
-                    "y0": 0,
-                    "y1": 1,
-                    "xref": "x",
-                    "yref": "paper",
-                    "fillcolor": "LightGreen",
-                    "opacity": 0.5,
-                    "layer": "below",
-                    "line_width": 0,
-                }
-            )
-            in_signal = False
-
-    # Handle case where the signal extends to the end of the data
-    if in_signal:
-        end_idx = data.index[-1]
-        shapes.append(
-            {
-                "type": "rect",
-                "x0": start_idx,
-                "x1": end_idx,
-                "y0": 0,
-                "y1": 1,
-                "xref": "x",
-                "yref": "paper",
-                "fillcolor": "LightGreen",
-                "opacity": 0.5,
-                "layer": "below",
-                "line_width": 0,
-            }
-        )
-
-    # Update layout with shapes
-    fig.update_layout(shapes=shapes)
-
-    # Update layout for the figure
-    # Get the last 30 candles
-    last_30_candles = data.iloc[-30:]
-
-    # Calculate the initial x-axis range (e.g., last 30 candles)
-    initial_x_range = [last_30_candles.index.min(), last_30_candles.index.max()]
+    # # Calculate the initial x-axis range (e.g., last 30 candles)
+    # initial_x_range = [last_30_candles.index.min(), last_30_candles.index.max()]
 
     fig.update_layout(
         height=800,  # Set the height of the plot
@@ -277,18 +283,18 @@ def plot_data(data, indices=[]):
                                datetime(2013, 11, 20)]
     )
 
-    # Add vertical lines at specified indices
-    for index in indices:
-        fig.add_shape(
-            type="line",
-            x0=index,
-            x1=index,
-            y0=0,
-            y1=1,
-            xref="x",
-            yref="paper",
-            line=dict(color="red", width=2),
-        )
+    # # Add vertical lines at specified indices
+    # for index in indices:
+    #     fig.add_shape(
+    #         type="line",
+    #         x0=index,
+    #         x1=index,
+    #         y0=0,
+    #         y1=1,
+    #         xref="x",
+    #         yref="paper",
+    #         line=dict(color="red", width=2),
+    #     )
     return fig
 
 
@@ -328,12 +334,17 @@ def main():
     data = download_data(symbol, interval)
 
     # Remove weekends from the data
+    data.index = pd.to_datetime(data.index)
     data = data[data.index.weekday < 5]
     data.reset_index(inplace=True)
     data.rename(columns={'index': 'Datetime'}, inplace=True)
 
+
+
     # Calculate indicators
     data = calculate_indicators(data, ema5_window, ema20_window, rsi_window)
+
+    st.dataframe(data)
 
     data_reduced = data[-candles:-1]
     signal_indices = data_reduced[data_reduced["long_signal"] == 1].index
