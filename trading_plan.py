@@ -27,22 +27,30 @@ headers = {
     "Notion-Version": "2022-06-28",
 }
 
-def calculate_trade_size(entry_price, stop_loss, account_balance, risk_per_trade_percent, risked_capital_percent):
+
+def calculate_trade_size(
+    entry_price,
+    stop_loss,
+    account_balance,
+    risk_per_trade_percent,
+    risked_capital_percent,
+):
     try:
         risk_per_trade = (risk_per_trade_percent / 100) * account_balance
         quantity = risk_per_trade / (entry_price - stop_loss)
         risked_capital_per_trade = (risked_capital_percent / 100) * account_balance
         if quantity * entry_price > risked_capital_per_trade:
-            quantity = floor(risked_capital_per_trade/ entry_price)
+            quantity = floor(risked_capital_per_trade / entry_price)
         return quantity
     except:
-        return 0
+        return 0,0
 
 
 # Caching the result of expensive_computation / data access using @st.cache_data
 @st.cache_data
 def get_earnings_dates_cached(ticker_symbol):
     return get_earnings_dates(ticker_symbol)
+
 
 global company_name
 
@@ -80,7 +88,7 @@ st.write(f"Risk per Trade (0.5%): ${risk_per_trade:,.2f}")
 st.write(f"Risked Capital per Trade (10%): ${risked_capital_per_trade:,.2f}")
 
 # Create a form in Streamlit
-#with st.form(key="trading_plan_form"):
+# with st.form(key="trading_plan_form"):
 ticker_symbol = st.text_input("Ticker-Symbol (Ticker Symbol)", "AAPL")
 
 try:
@@ -88,10 +96,12 @@ try:
     company_name = str(ticker.info["shortName"])
     st.write(company_name)
 except:
-    pass # TODO catch the exception
+    pass  # TODO catch the exception
 
 earnings_df = get_earnings_dates_cached(ticker_symbol)
-earnings_date, earnings_date_confirmed_retrieved = get_earnings_date_from_df(earnings_df, ticker_symbol)
+earnings_date, earnings_date_confirmed_retrieved = get_earnings_date_from_df(
+    earnings_df, ticker_symbol
+)
 pays_dividends, dividends_date_retrieved, ex_dividend_date, ticker = get_dividends_date(
     ticker_symbol
 )
@@ -120,11 +130,19 @@ with st.container(border=True):
             "Order Type", ["LMT", "MKT", "STP/STP LMT"], horizontal=True
         )
 
+
+# Initialize session state to preserve 'quantity' between reruns
+if "quantity" not in st.session_state:
+    st.session_state["quantity"] = 1  # Default quantity
+
+
 with st.container(border=True):
 
     col1, col2 = st.columns(2)
     with col1:
-        initial_stop = st.number_input("Initialer Stop (Initial Stop)", min_value=0.0, format="%.2f")
+        initial_stop = st.number_input(
+            "Initialer Stop (Initial Stop)", min_value=0.0, format="%.2f"
+        )
 
     with col2:
         calculate_quantity = st.button(label="Calculate quantity")
@@ -134,19 +152,17 @@ with st.container(border=True):
     col1, col2 = st.columns(2)
     with col1:
         if calculate_quantity:
-            quantity = st.number_input(
-                "Menge (Quantity)",
-                value=calculate_trade_size(
-                    entry_price,
-                    initial_stop,
-                    account_balance,
-                    risk_per_trade_percent,
-                    risked_capital_percent,
-                ),
-                min_value=0,
+            st.session_state["quantity"] = calculate_trade_size(
+                entry_price,
+                initial_stop,
+                account_balance,
+                risk_per_trade_percent,
+                risked_capital_percent,
             )
-        else: quantity = st.number_input(
-                "Menge (Quantity)", value=1)
+
+        quantity = st.number_input(
+            "Menge (Quantity)", value=st.session_state["quantity"])#, min_value=0.0, max_value=10000.0, step=1.0)
+        st.session_state["quantity"] = quantity
     with col2:
         action = st.radio("Aktion", options=["Long", "Short"], horizontal=True)
 
@@ -166,18 +182,26 @@ with st.container(border=True):
     with col1:
         earnings_date = st.date_input("Earnings Datum (Earnings Date)", earnings_date)
     with col2:
-        confirmation_index = 1 if earnings_date_confirmed_retrieved == True else 0 
-        earnings_date_confirmed = st.radio("Earnings Datum bestätigt (Earnings Date Confirmed)", ["Nein", "Ja"], index=confirmation_index, horizontal=True)
+        confirmation_index = 1 if earnings_date_confirmed_retrieved == True else 0
+        earnings_date_confirmed = st.radio(
+            "Earnings Datum bestätigt (Earnings Date Confirmed)",
+            ["Nein", "Ja"],
+            index=confirmation_index,
+            horizontal=True,
+        )
 
 with st.container(border=True):
     col1, col2 = st.columns(2)
     with col1:
 
-        dividends = st.number_input("Dividenden (Dividends)", min_value=0.0, format="%.2f")
+        dividends = st.number_input(
+            "Dividenden (Dividends)", min_value=0.0, format="%.2f"
+        )
     with col2:
-        if pays_dividends==False:
+        if pays_dividends == False:
             dividends_date = st.date_input(
-                "Dividenden Datum (Dividends Date)", None, 
+                "Dividenden Datum (Dividends Date)",
+                None,
             )
         else:
             dividends_date = st.date_input(
@@ -212,21 +236,21 @@ if submit_button:
     st.write("Entry Price:", entry_price)
     st.write("Order Validity:", validity)
     st.write("Exchange:", exchange)
-    #st.write("Long/Short:", long_short)
+    # st.write("Long/Short:", long_short)
     st.write("Quantity:", quantity)
     st.write("Earnings Date:", earnings_date)
     st.write("Dividends:", dividends)
     st.write("Trade Management Plan:", trade_management_plan)
-    #st.write("Date for Management Plan:", date_management)
-    #st.write("Amount:", amount_management)
+    # st.write("Date for Management Plan:", date_management)
+    # st.write("Amount:", amount_management)
     st.write("Plan B (Exit Scenario, Stop):", plan_b)
 
 if save_to_notion_button:
     # The data for the new entry
-    
+
     # Map the string response to a boolean
     earnings_date_confirmed_bool = True if earnings_date_confirmed == "Ja" else False
-    
+
     new_page_data = {
         "parent": {"database_id": notion_db_id},
         "properties": {
@@ -235,26 +259,37 @@ if save_to_notion_button:
             #     "rich_text": [{"text": {"content": "This is an example description."}}]
             # },
             "Action": {"select": {"name": "Long"}},
-            #"Date": {"date": {"start": date}},  # ISO 8601 formatted date with time
+            "Date": {
+                "date": {"start": date.isoformat()}
+            },  # ISO 8601 formatted date with time
             "Quantity": {"number": quantity},  # Quantity as a number
             "Entry Price": {"number": entry_price},
             "Initial Stop": {"number": initial_stop},
+            "Current Stop": {"number": initial_stop},
             "Order Validity": {"select": {"name": validity}},
             "Order Type": {"select": {"name": order_type}},
             "Earnings Date": {
                 "date": {"start": earnings_date.isoformat()}
             },  # ISO 8601 formatted date with time
-            "Dividends Date": {"date": {"start": dividends_date.isoformat()}},
+            # "Dividends Date": {"date": {"start": dividends_date.isoformat()}},
             "Dividends": {"number": dividends},
-            "Stock": {"rich_text": [{"text": {"content": stock}}]},  # Text for stock status
+            "Stock": {
+                "rich_text": [{"text": {"content": stock}}]
+            },  # Text for stock status
             "Trade Management": {
                 "rich_text": [{"text": {"content": trade_management_plan}}]
             },
             "Reason": {"rich_text": [{"text": {"content": reason}}]},
             "Plan B": {"rich_text": [{"text": {"content": plan_b}}]},
-            "Earnings Date Confirmed": {"checkbox" : earnings_date_confirmed_bool}
+            "Earnings Date Confirmed": {"checkbox": earnings_date_confirmed_bool},
         },
     }
+
+    # Conditionally add Dividends Date if it's not None
+    if dividends_date is not None:
+        new_page_data["properties"]["Dividends Date"] = {
+            "date": {"start": dividends_date.isoformat()}
+        }
 
     # Make the request
     response = requests.post(url, headers=headers, data=json.dumps(new_page_data))
