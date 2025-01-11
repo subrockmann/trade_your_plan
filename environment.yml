@@ -1,0 +1,21 @@
+name: fin
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - pandas
+  - plotly
+  - python==3.10
+  - yfinance
+  - libta-lib
+  - ta-lib
+  - notebook
+  - matplotlib
+  - pyarrow
+  - scipy
+  - anaconda::seaborn
+  - conda-forge::scikit-learn
+  - mlflow
+  - pytest
+  - pytest-runner
+  - libxml2
