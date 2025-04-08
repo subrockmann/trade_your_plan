@@ -28,22 +28,47 @@ headers = {
 }
 
 
-def calculate_trade_size(
+def calculate_position_size(
     entry_price,
     stop_loss,
     account_balance,
-    risk_per_trade_percent,
-    risked_capital_percent,
+    risk_per_trade_percent=0.5,
+    risked_capital_percent=10.0,
 ):
+    """
+    Calculate the trade size (quantity) based on risk management parameters.
+
+    Parameters:
+        entry_price (float): The price at which the trade is entered.
+        stop_loss (float): The stop loss price for the trade.
+        account_balance (float): The total account balance.
+        risk_per_trade_percent (float): The percentage of account balance to risk per trade.
+        risked_capital_percent (float): The maximum percentage of account balance to allocate to the trade.
+
+    Returns:
+        int: The calculated quantity of shares to trade.
+    """
     try:
+        # Calculate the dollar amount to risk per trade
         risk_per_trade = (risk_per_trade_percent / 100) * account_balance
+
+        # Calculate the quantity based on risk per trade and the difference between entry price and stop loss
         quantity = risk_per_trade / (entry_price - stop_loss)
-        risked_capital_per_trade = (risked_capital_percent / 100) * account_balance
-        if quantity * entry_price > risked_capital_per_trade:
-            quantity = floor(risked_capital_per_trade / entry_price)
+
+        # Calculate the maximum capital to allocate to the trade
+        max_capitial_per_trade = (risked_capital_percent / 100) * account_balance
+
+        # Adjust quantity if the total cost exceeds the allowed capital allocation
+        if quantity * entry_price > max_capitial_per_trade:
+            quantity = floor(max_capitial_per_trade / entry_price)
+
         return quantity
-    except:
-        return 0,0
+    except ZeroDivisionError:
+        # Handle division by zero if entry_price equals stop_loss
+        return 0
+    except Exception as e:
+        # Log or handle other unexpected exceptions
+        return 0
 
 
 # Caching the result of expensive_computation / data access using @st.cache_data
@@ -80,12 +105,12 @@ risked_capital_percent = st.sidebar.number_input(
     min_value=0.0,
     max_value=100.0,
 )
-risked_capital_per_trade = (risked_capital_percent / 100) * account_balance
+max_capitial_per_trade = (risked_capital_percent / 100) * account_balance
 
 # Displaying values in main app
 st.write(f"### Account Balance: ${account_balance:,.2f}")
 st.write(f"Risk per Trade (0.5%): ${risk_per_trade:,.2f}")
-st.write(f"Risked Capital per Trade (10%): ${risked_capital_per_trade:,.2f}")
+st.write(f"Risked Capital per Trade (10%): ${max_capitial_per_trade:,.2f}")
 
 # Create a form in Streamlit
 # with st.form(key="trading_plan_form"):
@@ -152,7 +177,7 @@ with st.container(border=True):
     col1, col2 = st.columns(2)
     with col1:
         if calculate_quantity:
-            st.session_state["quantity"] = calculate_trade_size(
+            st.session_state["quantity"] = calculate_position_size(
                 entry_price,
                 initial_stop,
                 account_balance,
