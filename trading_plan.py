@@ -62,6 +62,8 @@ def calculate_position_size(
         if quantity * entry_price > max_capitial_per_trade:
             quantity = floor(max_capitial_per_trade / entry_price)
 
+        # Ensure the quantity is always positive
+        quantity = floor(abs(quantity))
         return quantity
     except ZeroDivisionError:
         # Handle division by zero if entry_price equals stop_loss
