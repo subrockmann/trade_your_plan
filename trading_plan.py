@@ -118,6 +118,38 @@ st.write(f"Risked Capital per Trade (10%): ${max_capitial_per_trade:,.2f}")
 # with st.form(key="trading_plan_form"):
 ticker_symbol = st.text_input("Ticker-Symbol (Ticker Symbol)", "")
 
+# Initialize session state variables for all input fields
+if 'previous_ticker_symbol' not in st.session_state:
+    st.session_state['previous_ticker_symbol'] = ""
+if 'entry_price' not in st.session_state:
+    st.session_state['entry_price'] = 0.0
+if 'initial_stop' not in st.session_state:
+    st.session_state['initial_stop'] = 0.0
+if 'quantity' not in st.session_state:
+    st.session_state['quantity'] = 0
+if 'stock' not in st.session_state:
+    st.session_state['stock'] = ""
+if 'action' not in st.session_state:
+    st.session_state['action'] = ""
+if 'reason' not in st.session_state:
+    st.session_state['reason'] = ""
+if 'trade_management_plan' not in st.session_state:
+    st.session_state['trade_management_plan'] = ""
+if 'plan_b' not in st.session_state:
+    st.session_state['plan_b'] = ""
+
+# Clear all input fields if a new symbol is chosen
+if ticker_symbol != st.session_state['previous_ticker_symbol']:
+    st.session_state['previous_ticker_symbol'] = ticker_symbol
+    st.session_state['entry_price'] = 0.0
+    st.session_state['initial_stop'] = 0.0
+    st.session_state['quantity'] = 0
+    st.session_state['stock'] = ""
+    st.session_state['action'] = ""
+    st.session_state['reason'] = ""
+    st.session_state['trade_management_plan'] = ""
+    st.session_state['plan_b'] = ""
+
 if ticker_symbol:  # Only proceed if a ticker symbol is provided
     try:
         ticker = yf.Ticker(ticker_symbol)
@@ -133,7 +165,8 @@ if ticker_symbol:  # Only proceed if a ticker symbol is provided
             ticker_symbol
         )
 
-        stock = st.text_input("Aktie (Stock)", value=company_name)
+        # Removed redundant 'value' parameter for widgets with 'key' to avoid warnings
+        stock = st.text_input("Aktie (Stock)", key="stock")
     except Exception as e:
         st.write("Error fetching data for the ticker symbol. Please check the input.")
         company_name = ""
@@ -163,7 +196,7 @@ with st.container(border=True):
 
     with col1:
         entry_price = st.number_input(
-            "Preis (Entry Price)", min_value=0.0, format="%.2f"
+            "Preis (Entry Price)", min_value=0.0, format="%.2f", key="entry_price"
         )
 
     with col2:
@@ -177,7 +210,7 @@ with st.container(border=True):
     col1, col2 = st.columns(2)
     with col1:
         initial_stop = st.number_input(
-            "Initialer Stop (Initial Stop)", min_value=0.0, format="%.2f"
+            "Initialer Stop (Initial Stop)", min_value=0.0, format="%.2f", key="initial_stop"
         )
 
     with col2:
@@ -264,13 +297,13 @@ with st.container(border=True):
 with st.container(border=True):
     st.text("Drei wichtige Fragen vor jedem Trade")
     reason = st.text_area(
-        "Warum eröffne ich die Position? (Reason for opening the position)"
+        "Warum eröffne ich die Position? (Reason for opening the position)", key="reason"
     )
     trade_management_plan = st.text_area(
-        "Wie manage ich den Trade? (Trade Management Plan)"
+        "Wie manage ich den Trade? (Trade Management Plan)", key="trade_management_plan"
     )
 
-    plan_b = st.text_area("Was ist mein Plan B? (Plan B - Exit Scenario, Stop)")
+    plan_b = st.text_area("Was ist mein Plan B? (Plan B - Exit Scenario, Stop)", key="plan_b")
 
 # Add a submit button
 submit_button = st.button(label="Save")
