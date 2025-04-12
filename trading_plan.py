@@ -283,7 +283,7 @@ if save_to_notion_button:
             # "Description": {
             #     "rich_text": [{"text": {"content": "This is an example description."}}]
             # },
-            "Action": {"select": {"name": "Long"}},
+            "Action": {"select": {"name": action}},
             "Date": {
                 "date": {"start": date.isoformat()}
             },  # ISO 8601 formatted date with time
