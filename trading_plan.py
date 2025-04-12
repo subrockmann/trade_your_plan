@@ -190,8 +190,20 @@ with st.container(border=True):
         quantity = st.number_input(
             "Menge (Quantity)", value=st.session_state["quantity"])#, min_value=0.0, max_value=10000.0, step=1.0)
         st.session_state["quantity"] = quantity
+
+        # Automatically toggle Aktion based on initial_stop and entry_price
+        if initial_stop < entry_price:
+            action = "Long"
+        else:
+            action = "Short"
+
     with col2:
-        action = st.radio("Aktion", options=["Long", "Short"], horizontal=True)
+        # Increase font size and center the label vertically
+        if initial_stop < entry_price:
+            action_label = '<div style="color:green; font-weight:bold; font-size:30px; text-align:center;">Long</div>'
+        else:
+            action_label = '<div style="color:red; font-weight:bold; font-size:30px; text-align:center;">Short</div>'
+        st.markdown(f"Aktion:<br>{action_label}", unsafe_allow_html=True)
 
 with st.container(border=True):
     col1, col2 = st.columns(2)
