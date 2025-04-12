@@ -116,24 +116,38 @@ st.write(f"Risked Capital per Trade (10%): ${max_capitial_per_trade:,.2f}")
 
 # Create a form in Streamlit
 # with st.form(key="trading_plan_form"):
-ticker_symbol = st.text_input("Ticker-Symbol (Ticker Symbol)", "AAPL")
+ticker_symbol = st.text_input("Ticker-Symbol (Ticker Symbol)", "")
 
-try:
-    ticker = yf.Ticker(ticker_symbol)
-    company_name = str(ticker.info["shortName"])
-    st.write(company_name)
-except:
-    pass  # TODO catch the exception
+if ticker_symbol:  # Only proceed if a ticker symbol is provided
+    try:
+        ticker = yf.Ticker(ticker_symbol)
+        company_name = str(ticker.info.get("shortName", ""))
+        st.write(company_name)
 
-earnings_df = get_earnings_dates_cached(ticker_symbol)
-earnings_date, earnings_date_confirmed_retrieved = get_earnings_date_from_df(
-    earnings_df, ticker_symbol
-)
-pays_dividends, dividends_date_retrieved, ex_dividend_date, ticker = get_dividends_date(
-    ticker_symbol
-)
+        # Fetch earnings and dividends data
+        earnings_df = get_earnings_dates_cached(ticker_symbol)
+        earnings_date, earnings_date_confirmed_retrieved = get_earnings_date_from_df(
+            earnings_df, ticker_symbol
+        )
+        pays_dividends, dividends_date_retrieved, ex_dividend_date, ticker = get_dividends_date(
+            ticker_symbol
+        )
 
-stock = st.text_input("Aktie (Stock)", value=company_name)
+        stock = st.text_input("Aktie (Stock)", value=company_name)
+    except Exception as e:
+        st.write("Error fetching data for the ticker symbol. Please check the input.")
+        company_name = ""
+        earnings_date = None
+        earnings_date_confirmed_retrieved = False
+        pays_dividends = False
+        dividends_date_retrieved = None
+else:
+    st.write("Please enter a valid ticker symbol to proceed.")
+    company_name = ""
+    earnings_date = None
+    earnings_date_confirmed_retrieved = False
+    pays_dividends = False
+    dividends_date_retrieved = None
 
 with st.container(border=True):
     col1, col2 = st.columns(2)
@@ -158,11 +172,6 @@ with st.container(border=True):
         )
 
 
-# Initialize session state to preserve 'quantity' between reruns
-if "quantity" not in st.session_state:
-    st.session_state["quantity"] = 1  # Default quantity
-
-
 with st.container(border=True):
 
     col1, col2 = st.columns(2)
@@ -178,18 +187,22 @@ with st.container(border=True):
 with st.container(border=True):
     col1, col2 = st.columns(2)
     with col1:
+        # Removed session state for quantity and calculate dynamically
         if calculate_quantity:
-            st.session_state["quantity"] = calculate_position_size(
+            quantity = calculate_position_size(
                 entry_price,
                 initial_stop,
                 account_balance,
                 risk_per_trade_percent,
                 risked_capital_percent,
             )
+        else:
+            quantity = 0  # Default value if not calculated
 
-        quantity = st.number_input(
-            "Menge (Quantity)", value=st.session_state["quantity"])#, min_value=0.0, max_value=10000.0, step=1.0)
-        st.session_state["quantity"] = quantity
+        # Replace the number input for quantity with a styled label and color it based on action
+        quantity_color = "green" if initial_stop < entry_price else "red"
+        quantity_label = f'<div style="color:{quantity_color}; font-weight:bold; font-size:30px; text-align:center;">{quantity}</div>'
+        st.markdown(f"Menge (Quantity):<br>{quantity_label}", unsafe_allow_html=True)
 
         # Automatically toggle Aktion based on initial_stop and entry_price
         if initial_stop < entry_price:
