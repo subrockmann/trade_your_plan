@@ -171,8 +171,6 @@ if ticker_symbol:  # Only proceed if a ticker symbol is provided
             ticker_symbol
         )
 
-        # Removed redundant 'value' parameter for widgets with 'key' to avoid warnings
-        stock = st.text_input("Aktie (Stock)", key="stock")
     except Exception as e:
         st.write("Error fetching data for the ticker symbol. Please check the input.")
         company_name = ""
