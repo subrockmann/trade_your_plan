@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 import yfinance as yf
 from pyfinsights.yfin import get_earnings_dates, get_dividends_date
 from pyfinsights.utils import get_earnings_date_from_df
+from pyfinsights.ibkrapi import place_US_stock_stop_limit_with_stop_loss, create_contract_US_stock
 
 load_dotenv()
 
@@ -70,7 +71,7 @@ def calculate_position_size(
         return 0
     except Exception as e:
         # Log or handle other unexpected exceptions
-        return 0
+        return -99
 
 
 # Caching the result of expensive_computation / data access using @st.cache_data
@@ -107,6 +108,11 @@ risked_capital_percent = st.sidebar.number_input(
     min_value=0.0,
     max_value=100.0,
 )
+
+price_offset = st.sidebar.number_input(
+    "Price Offset ($)", value=0.002, step=0.01, min_value=0.0, format="%.2f"
+)
+
 max_capitial_per_trade = (risked_capital_percent / 100) * account_balance
 
 # Displaying values in main app
@@ -222,7 +228,7 @@ with st.container(border=True):
     with col1:
         # Removed session state for quantity and calculate dynamically
         if calculate_quantity:
-            quantity = calculate_position_size(
+            st.session_state['quantity'] = calculate_position_size(
                 entry_price,
                 initial_stop,
                 account_balance,
@@ -230,11 +236,12 @@ with st.container(border=True):
                 risked_capital_percent,
             )
         else:
-            quantity = 0  # Default value if not calculated
+            #st.session_state['quantity'] = 0  # Default value if not calculated
+            pass
 
         # Replace the number input for quantity with a styled label and color it based on action
         quantity_color = "green" if initial_stop < entry_price else "red"
-        quantity_label = f'<div style="color:{quantity_color}; font-weight:bold; font-size:30px; text-align:center;">{quantity}</div>'
+        quantity_label = f'<div style="color:{quantity_color}; font-weight:bold; font-size:30px; text-align:center;">{st.session_state["quantity"]}</div>'
         st.markdown(f"Menge (Quantity):<br>{quantity_label}", unsafe_allow_html=True)
 
         # Automatically toggle Aktion based on initial_stop and entry_price
@@ -309,6 +316,36 @@ with st.container(border=True):
 submit_button = st.button(label="Save")
 save_to_notion_button = st.button(label="Save to Notion")
 
+# Add a button to submit the order to TWS
+submit_to_tws_button = st.button(label="Submit to TWS")
+
+broker_action = "BUY" if initial_stop < entry_price else "SELL"
+limit_price = (
+    entry_price + price_offset
+    if initial_stop < entry_price
+    else entry_price - price_offset
+)
+
+if submit_to_tws_button:
+    try:
+        contract = create_contract_US_stock(ticker_symbol)
+
+        # Call the function to place the order
+        result = place_US_stock_stop_limit_with_stop_loss(
+            action=broker_action,
+            contract=contract,
+            quantity=st.session_state['quantity'],
+            stop_price=float(f"{entry_price:.2f}"), 
+            limit_price=float(f"{limit_price:.2f}"),  # Format limit_price to 2 decimal places
+            stop_loss_price=float(f"{initial_stop:.2f}") ,
+            tif="DAY",
+            transmit=False,
+            port=7497,
+        )
+        st.write("Order submitted successfully:", result)
+    except Exception as e:
+        st.write("Failed to submit the order. Error:", str(e))
+
 # Process the form data
 if submit_button:
     st.write("Form Submitted!")
@@ -322,7 +359,7 @@ if submit_button:
     st.write("Order Validity:", validity)
     st.write("Exchange:", exchange)
     # st.write("Long/Short:", long_short)
-    st.write("Quantity:", quantity)
+    st.write("Quantity:", st.session_state['quantity'])
     st.write("Earnings Date:", earnings_date)
     st.write("Dividends:", dividends)
     st.write("Trade Management Plan:", trade_management_plan)
@@ -331,56 +368,59 @@ if submit_button:
     st.write("Plan B (Exit Scenario, Stop):", plan_b)
 
 if save_to_notion_button:
-    # The data for the new entry
+    if st.session_state['quantity'] == 0:
+        st.write("Quantity is 0. Please calculate the quantity before saving to Notion.")
+    else:
+        # The data for the new entry
 
-    # Map the string response to a boolean
-    earnings_date_confirmed_bool = True if earnings_date_confirmed == "Ja" else False
+        # Map the string response to a boolean
+        earnings_date_confirmed_bool = True if earnings_date_confirmed == "Ja" else False
 
-    new_page_data = {
-        "parent": {"database_id": notion_db_id},
-        "properties": {
-            "Symbol": {"title": [{"text": {"content": ticker_symbol}}]},
-            # "Description": {
-            #     "rich_text": [{"text": {"content": "This is an example description."}}]
-            # },
-            "Action": {"select": {"name": action}},
-            "Date": {
-                "date": {"start": date.isoformat()}
-            },  # ISO 8601 formatted date with time
-            "Quantity": {"number": quantity},  # Quantity as a number
-            "Entry Price": {"number": entry_price},
-            "Initial Stop": {"number": initial_stop},
-            "Current Stop": {"number": initial_stop},
-            "Order Validity": {"select": {"name": validity}},
-            "Order Type": {"select": {"name": order_type}},
-            "Earnings Date": {
-                "date": {"start": earnings_date.isoformat()}
-            },  # ISO 8601 formatted date with time
-            # "Dividends Date": {"date": {"start": dividends_date.isoformat()}},
-            "Dividends": {"number": dividends},
-            "Stock": {
-                "rich_text": [{"text": {"content": stock}}]
-            },  # Text for stock status
-            "Trade Management": {
-                "rich_text": [{"text": {"content": trade_management_plan}}]
+        new_page_data = {
+            "parent": {"database_id": notion_db_id},
+            "properties": {
+                "Symbol": {"title": [{"text": {"content": ticker_symbol}}]},
+                # "Description": {
+                #     "rich_text": [{"text": {"content": "This is an example description."}}]
+                # },
+                "Action": {"select": {"name": action}},
+                "Date": {
+                    "date": {"start": date.isoformat()}
+                },  # ISO 8601 formatted date with time
+                "Quantity": {"number": st.session_state['quantity']},  # Quantity as a number
+                "Entry Price": {"number": entry_price},
+                "Initial Stop": {"number": initial_stop},
+                "Current Stop": {"number": initial_stop},
+                "Order Validity": {"select": {"name": validity}},
+                "Order Type": {"select": {"name": order_type}},
+                "Earnings Date": {
+                    "date": {"start": earnings_date.isoformat()}
+                },  # ISO 8601 formatted date with time
+                # "Dividends Date": {"date": {"start": dividends_date.isoformat()}},
+                "Dividends": {"number": dividends},
+                "Stock": {
+                    "rich_text": [{"text": {"content": stock}}]
+                },  # Text for stock status
+                "Trade Management": {
+                    "rich_text": [{"text": {"content": trade_management_plan}}]
+                },
+                "Reason": {"rich_text": [{"text": {"content": reason}}]},
+                "Plan B": {"rich_text": [{"text": {"content": plan_b}}]},
+                "Earnings Date Confirmed": {"checkbox": earnings_date_confirmed_bool},
             },
-            "Reason": {"rich_text": [{"text": {"content": reason}}]},
-            "Plan B": {"rich_text": [{"text": {"content": plan_b}}]},
-            "Earnings Date Confirmed": {"checkbox": earnings_date_confirmed_bool},
-        },
-    }
-
-    # Conditionally add Dividends Date if it's not None
-    if dividends_date is not None:
-        new_page_data["properties"]["Dividends Date"] = {
-            "date": {"start": dividends_date.isoformat()}
         }
 
-    # Make the request
-    response = requests.post(url, headers=headers, data=json.dumps(new_page_data))
+        # Conditionally add Dividends Date if it's not None
+        if dividends_date is not None:
+            new_page_data["properties"]["Dividends Date"] = {
+                "date": {"start": dividends_date.isoformat()}
+            }
 
-    # Check the response
-    if response.status_code == 200:
-        st.write("Trade info has been saved to Notion")
-    else:
-        st.write("Failed to create a page. Response:", response.json())
+        # Make the request
+        response = requests.post(url, headers=headers, data=json.dumps(new_page_data))
+
+        # Check the response
+        if response.status_code == 200:
+            st.write("Trade info has been saved to Notion")
+        else:
+            st.write("Failed to create a page. Response:", response.json())
