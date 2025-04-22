@@ -19,3 +19,7 @@ dependencies:
   - pytest
   - pytest-runner
   - libxml2
+  - pip:
+      - python-dotenv
+      - streamlit
+

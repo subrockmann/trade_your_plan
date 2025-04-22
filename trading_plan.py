@@ -6,7 +6,7 @@ import os
 from math import floor
 from dotenv import load_dotenv
 import yfinance as yf
-from pyfinsights.yfinance import get_earnings_dates, get_dividends_date
+from pyfinsights.yfin import get_earnings_dates, get_dividends_date
 from pyfinsights.utils import get_earnings_date_from_df
 
 load_dotenv()
