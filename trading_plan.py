@@ -110,8 +110,9 @@ risked_capital_percent = st.sidebar.number_input(
 )
 
 price_offset = st.sidebar.number_input(
-    "Price Offset ($)", value=0.002, step=0.01, min_value=0.0, format="%.2f"
+    "Price Offset ($)", value=0.02, step=0.01, min_value=0.0, format="%.2f"
 )
+price_offset = float(f"{price_offset:.2f}")
 
 max_capitial_per_trade = (risked_capital_percent / 100) * account_balance
 
@@ -202,6 +203,7 @@ with st.container(border=True):
         entry_price = st.number_input(
             "Preis (Entry Price)", min_value=0.0, format="%.2f", key="entry_price"
         )
+        entry_price = float(f"{entry_price:.2f}")
 
     with col2:
         order_type = st.radio(
@@ -311,13 +313,14 @@ with st.container(border=True):
     plan_b = st.text_area("Was ist mein Plan B? (Plan B - Exit Scenario, Stop)", key="plan_b")
 
 # Add a submit button
-submit_button = st.button(label="Save")
+# submit_button = st.button(label="Save")
 save_to_notion_button = st.button(label="Save to Notion")
 
 # Add a button to submit the order to TWS
 submit_to_tws_button = st.button(label="Submit to TWS")
 
 broker_action = "BUY" if initial_stop < entry_price else "SELL"
+
 limit_price = (
     entry_price + price_offset
     if initial_stop < entry_price
@@ -345,25 +348,25 @@ if submit_to_tws_button:
         st.write("Failed to submit the order. Error:", str(e))
 
 # Process the form data
-if submit_button:
-    st.write("Form Submitted!")
-    st.write("Reason for opening the position:", reason)
-    st.write("Date:", date)
-    st.write("Time:", time)
-    st.write("Action:", action)
-    st.write("Stock:", company_name)
-    st.write("Ticker Symbol:", ticker_symbol)
-    st.write("Entry Price:", entry_price)
-    st.write("Order Validity:", validity)
-    st.write("Exchange:", exchange)
-    # st.write("Long/Short:", long_short)
-    st.write("Quantity:", st.session_state['quantity'])
-    st.write("Earnings Date:", earnings_date)
-    st.write("Dividends:", dividends)
-    st.write("Trade Management Plan:", trade_management_plan)
-    # st.write("Date for Management Plan:", date_management)
-    # st.write("Amount:", amount_management)
-    st.write("Plan B (Exit Scenario, Stop):", plan_b)
+# if submit_button:
+#     st.write("Form Submitted!")
+#     st.write("Reason for opening the position:", reason)
+#     st.write("Date:", date)
+#     st.write("Time:", time)
+#     st.write("Action:", action)
+#     st.write("Stock:", company_name)
+#     st.write("Ticker Symbol:", ticker_symbol)
+#     st.write("Entry Price:", entry_price)
+#     st.write("Order Validity:", validity)
+#     st.write("Exchange:", exchange)
+#     # st.write("Long/Short:", long_short)
+#     st.write("Quantity:", st.session_state['quantity'])
+#     st.write("Earnings Date:", earnings_date)
+#     st.write("Dividends:", dividends)
+#     st.write("Trade Management Plan:", trade_management_plan)
+#     # st.write("Date for Management Plan:", date_management)
+#     # st.write("Amount:", amount_management)
+#     st.write("Plan B (Exit Scenario, Stop):", plan_b)
 
 if save_to_notion_button:
     if st.session_state['quantity'] == 0:
@@ -397,7 +400,7 @@ if save_to_notion_button:
                 # "Dividends Date": {"date": {"start": dividends_date.isoformat()}},
                 "Dividends": {"number": dividends},
                 "Stock": {
-                    "rich_text": [{"text": {"content": stock}}]
+                    "rich_text": [{"text": {"content": company_name}}]
                 },  # Text for stock status
                 "Trade Management": {
                     "rich_text": [{"text": {"content": trade_management_plan}}]
